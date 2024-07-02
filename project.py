@@ -64,11 +64,8 @@ with Eda:
     st.write('NA values:', data.isnull().values.any())
     st.info("This Shows that there are no null values")
 
-    st.header('Year Wise Distribution Of The DataSet')
-    sd = data.index[0]
-    ed = data.index[-1]
-    st.write('Starting Date', sd)
-    st.write('Ending Date', ed)
+    st.title('Year Wise Distribution Of The DataSet')
+  
 
 new_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 
              'September', 'October', 'November', 'December']
@@ -156,7 +153,7 @@ def monthly_high_low_chart(yearlyDataset):
     fig.update_layout(barmode='group', title='Monthwise High and Low ' + coin_name + ' price')
     st.plotly_chart(fig)
 
-st.title("Cryptocurrency Analysis")
+st.header("Cryptocurrency Analysis")
 
 start_date = st.date_input("Start date")
 end_date = st.date_input("End date")
