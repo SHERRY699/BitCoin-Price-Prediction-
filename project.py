@@ -10,10 +10,11 @@ import plotly.express as px
 from itertools import cycle
 import calendar
 
-st.header("Bitcoin Price Prediction")
-st.info("This Will Give Analysis on the present and last ten year prices of bitcoin")
+st.header("Crypto Price Prediction")
+st.info("This Will Give Analysis on the present and last ten year prices of crypto coins")
 
-coin_name = "BTC"
+# Input for coin name
+coin_name = st.text_input("Enter the cryptocurrency symbol (e.g., BTC, ETH)", "BTC")
 
 def remove(x):
     """
@@ -77,7 +78,7 @@ with Eda:
     def yearly_chart(yearlyDataset):
         names = cycle([coin_name + ' Close Price', coin_name])
         
-        fig = px.line(yearlyDataset, x=yearlyDataset.index, y=[yearlyDataset['Close']],
+        fig = px.line(yearlyDataset, x=yearlyDataset.index, y='Close',
                     labels={'Date': 'Date', 'value': coin_name + ' value'})
         fig.update_layout(title_text=coin_name + ' analysis chart', font_size=15, font_color='black', legend_title_text=coin_name + ' Parameters')
         fig.for_each_trace(lambda t: t.update(name=next(names)))
@@ -171,6 +172,31 @@ with Eda:
         
         st.subheader(f"Monthly High and Low Chart for {coin_name}")
         monthly_high_low_chart(year_2014)
+        
+        st.subheader(f"Heatmap of Monthly Volume for {coin_name}")
+        data_copy = data.copy()
+        data_copy.index = pd.to_datetime(data_copy.index, format='%Y-%m-%d')
+        data_copy['Month'] = data_copy.index.month
+        data_copy['Year'] = data_copy.index.year
+        grouped_data = data_copy.groupby(['Year', 'Month'])['Volume'].sum().reset_index()
+        grouped_data['Month'] = grouped_data['Month'].apply(lambda x: calendar.month_name[x])
+        x = grouped_data.pivot_table(index='Year', columns='Month', values='Volume', aggfunc='sum')
+        x.columns = pd.Categorical(x.columns, categories=new_order, ordered=True)
+        x = x.sort_index(axis=1)
+
+    # Plotting heatmap with Plotly
+        fig_heatmap = go.Figure(data=go.Heatmap(
+        z=x.values,
+        x=x.columns,
+        y=x.index,
+        colorscale='Viridis'
+    ))
+        fig_heatmap.update_layout(
+        title=f"Heatmap of Monthly Volume for {coin_name}",
+        xaxis_title='Month',
+        yaxis_title='Year'
+    )
+        st.plotly_chart(fig_heatmap)
 
 with DataPreprocessing:
     st.write("Data Preprocessing tab content goes here")
