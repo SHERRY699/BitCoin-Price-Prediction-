@@ -7,7 +7,6 @@ import datetime as dt
 import streamlit as st 
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 from itertools import cycle
 import calendar
 
@@ -24,15 +23,15 @@ def remove(x):
     res = x.split(" ")[0]
     return res
 
-data = yf.download(coin_name+"-USD",period="max")
+data = yf.download(coin_name+"-USD", period="max")
 
 st.subheader('DataSet')
 st.write(data)
 
 data.index = pd.to_datetime(data.index, format='%Y-%m-%d')
-data.index = data.index.to_series().apply(lambda x:remove(x))  # applying preprocessing function
+data.index = data.index.to_series().apply(lambda x: remove(x))  # applying preprocessing function
 
-Eda, DataPreprocessing, models = st.tabs(['Exploratory Data Analysis','Data PreProcessing','Models'])
+Eda, DataPreprocessing, Models = st.tabs(['Exploratory Data Analysis','Data PreProcessing','Models'])
 
 with Eda:
     st.subheader('Shape')
@@ -48,8 +47,8 @@ with Eda:
     st.write(tail)
 
     st.subheader('Info')
-    info =data.info()
-    st.text(info)
+    info = data.info
+    st.write(info)
 
     st.subheader('Describe')
     describe = data.describe()
@@ -65,12 +64,11 @@ with Eda:
     st.info("This Shows that there are no null values")
 
     st.title('Year Wise Distribution Of The DataSet')
-  
 
     new_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 
-             'September', 'October', 'November', 'December']
+                 'September', 'October', 'November', 'December']
 
-# Define the functions
+    # Define functions specific to EDA tab
     def yearly_analysis(start_date, end_date):
         year = data.loc[start_date:end_date]
         year.index = pd.to_datetime(year.index, format='%Y-%m-%d')
@@ -153,27 +151,29 @@ with Eda:
         fig.update_layout(barmode='group', title='Monthwise High and Low ' + coin_name + ' price')
         st.plotly_chart(fig)
 
-        st.header("Cryptocurrency Analysis")
+    # Input for start and end dates
+    start_date = st.date_input("Start date")
+    end_date = st.date_input("End date")
 
-        start_date = st.date_input("Start date")
-        end_date = st.date_input("End date")
-
-        if start_date and end_date:
-            start_date = start_date.strftime('%Y-%m-%d')
-            end_date = end_date.strftime('%Y-%m-%d')
+    if start_date and end_date:
+        start_date = start_date.strftime('%Y-%m-%d')
+        end_date = end_date.strftime('%Y-%m-%d')
+    
+    if st.button("Analyze"):
+        year_2014 = yearly_analysis(start_date, end_date)
+        monthly_2014 = every_year_monthwise_analysis(year_2014)
         
-        if st.button("Analyze"):
-            year_2014 = yearly_analysis(start_date, end_date)
-            monthly_2014 = every_year_monthwise_analysis(year_2014)
-            
-            st.subheader(f"Yearly Chart for {coin_name}")
-            yearly_chart(year_2014)
-            
-            st.subheader(f"Monthly Open and Close Chart for {coin_name}")
-            monthly_open_close_chart(monthly_2014)
-            
-            st.subheader(f"Monthly High and Low Chart for {coin_name}")
-            monthly_high_low_chart(year_2014)
+        st.subheader(f"Yearly Chart for {coin_name}")
+        yearly_chart(year_2014)
+        
+        st.subheader(f"Monthly Open and Close Chart for {coin_name}")
+        monthly_open_close_chart(monthly_2014)
+        
+        st.subheader(f"Monthly High and Low Chart for {coin_name}")
+        monthly_high_low_chart(year_2014)
 
-        else:
-            st.write("Please enter the start date and end date.")
+with DataPreprocessing:
+    st.write("Data Preprocessing tab content goes here")
+
+with Models:
+    st.write("Models tab content goes here")
