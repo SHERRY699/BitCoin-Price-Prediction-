@@ -5,3 +5,4 @@ seaborn
 yfinance
 plotly
 streamlit
+scikit-learn
