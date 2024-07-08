@@ -16,6 +16,16 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from scipy.optimize import minimize
+from sklearn.svm import SVR
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.preprocessing import StandardScaler
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
+
+
+# import tensorflow.compat.v1 as tf
 
 
 st.header("Crypto Price Prediction")
@@ -46,8 +56,8 @@ data.index = data.index.to_series().apply(
     lambda x: remove(x)
 )  # applying preprocessing function
 
-Eda, DataPreprocessing, Models = st.tabs(
-    ["Exploratory Data Analysis", "Data PreProcessing", "Models"]
+Eda, DataPreprocessing, Models, Compare = st.tabs(
+    ["Exploratory Data Analysis", "Data PreProcessing", "Models", "Final Comparison"]
 )
 
 with Eda:
@@ -302,12 +312,30 @@ with DataPreprocessing:
     data["SMA"] = SMA(data)
     data["EMA"] = EMA(data)
 
-    st.write(data)
+    future_days = st.text_input("enter the number of future predictions days")
+    if future_days:
+        try:
+            # Convert input to integer
+            future_days = int(future_days)
+
+            # Create a new column for future predictions
+            data[str(future_days) + "_Days_Price_Pred"] = data[["Close"]].shift(
+                -future_days
+            )
+
+            # Select relevant columns to display
+            future_data = data[["Close", str(future_days) + "_Days_Price_Pred"]]
+
+            # Display the DataFrame
+            st.write(future_data)
+        except ValueError:
+            st.error("Invalid input. Please enter a valid number of days.")
 
     st.title("Scaling The Data")
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
-    scaled_df = pd.DataFrame(scaled_data, columns=data.columns)
+    scaled_df = pd.DataFrame(scaled_data, columns=data.columns, index=data.index)
+
     st.write(scaled_df)
 
 
@@ -315,142 +343,19 @@ with Models:
 
     WPP, PP = st.tabs(["Without Python Package", "With Python Package"])
 
+    def evaluate_model(model, X_test, y_test):
+        y_pred = model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        return mse, rmse, r2, mae
+
     with PP:
-        future_days = st.text_input("Enter the days for future prediction")
+
+        # future_days = st.number_input("Enter the days for future prediction")
         if future_days:
-            
-            try:
-                # Convert input to integer
-                future_days = int(future_days)
-
-                # Create a new column for future predictions
-                data[str(future_days) + "_Days_Price_Pred"] = data[["Close"]].shift(
-                    -future_days
-                )
-
-                # Select relevant columns to display
-                future_data = data[["Close", str(future_days) + "_Days_Price_Pred"]]
-
-                # Display the DataFrame
-                st.write(future_data)
-            except ValueError:
-                st.error("Invalid input. Please enter a valid number of days.")
-
-            st.header("Normal Data Using only Close Column")
-            columns_to_extract = ["Close"]  # specify the columns you want to extract
-            X = np.array(data[columns_to_extract])
-            X = X[: data.shape[0] - future_days]
-            y = np.array(data[str(future_days) + "_Days_Price_Pred"])
-            y = y[:-future_days]
-            tscv = TimeSeriesSplit(n_splits=5)
-            for train_index, test_index in tscv.split(X):
-                X_train, X_test = X[train_index], X[test_index]
-                y_train, y_test = y[train_index], y[test_index]
-
-            st.subheader("SVM MODEL")
-            svr_rbf = SVR(kernel="rbf", C=1e3, gamma=0.00001)
-            svr_rbf.fit(X_train, y_train)
-            svr_rbf_confidence = svr_rbf.score(X_test, y_test)
-            st.write(svr_rbf_confidence)
-
-            st.subheader("Linear Regression")
-            lr_model = LinearRegression()
-            lr_model.fit(X_train, y_train)
-            lr_confidence = lr_model.score(X_test, y_test)
-            st.write(lr_confidence)
-
-            st.subheader("Random Forest")
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_model.fit(X_train, y_train)
-            rf_confidence = rf_model.score(X_test, y_test)
-            st.write(rf_confidence)
-
-            st.header("Normal Data Using All Columns")
-            columns_to_extract = [
-                "Close",
-                "MACD",
-                "RSI",
-                "SMA",
-                "EMA",
-            ]  # specify the columns you want to extract
-            X = np.array(data[columns_to_extract])
-            X = X[30 : data.shape[0] - future_days]
-            y = np.array(data[str(future_days) + "_Days_Price_Pred"])
-            y = y[30:-future_days]
-            tscv = TimeSeriesSplit(n_splits=5)
-            for train_index, test_index in tscv.split(X):
-                X_train, X_test = X[train_index], X[test_index]
-                y_train, y_test = y[train_index], y[test_index]
-
-            st.subheader("Svm model")
-            svr_rbf = SVR(kernel="rbf", C=1e3, gamma=0.00001)
-            svr_rbf.fit(X_train, y_train)
-            svr_rbf_confidence = svr_rbf.score(X_test, y_test)
-            st.write(svr_rbf_confidence)
-
-            st.subheader("Linear Regression  model")
-            lr_model = LinearRegression()
-            lr_model.fit(X_train, y_train)
-            lr_confidence = lr_model.score(X_test, y_test)
-            st.write(lr_confidence)
-
-            st.subheader("Random Forest model")
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_model.fit(X_train, y_train)
-            rf_confidence = rf_model.score(X_test, y_test)
-            st.write(rf_confidence)
-
-            st.header("Scaled Data Using Only Close Column")
-            try:
-                future_days = int(future_days)  # Convert to integer
-
-                # Create a new column for future predictions
-                scaled_df[str(future_days) + "_Days_Price_Pred"] = scaled_df[
-                    "Close"
-                ].shift(-future_days)
-
-                # Drop rows with NaN values
-                scaled_df = scaled_df.dropna(
-                    subset=[str(future_days) + "_Days_Price_Pred"]
-                )
-
-                # Select relevant columns to display
-                future_data = scaled_df[
-                    ["Close", str(future_days) + "_Days_Price_Pred"]
-                ]
-
-            except ValueError:
-                st.error("Invalid input. Please enter a valid number of days.")
-
-            columns_to_extract = ["Close"]  # specify the columns you want to extract
-            X = np.array(scaled_df[columns_to_extract])
-            X = X[: scaled_df.shape[0] - future_days]
-            y = np.array(scaled_df[str(future_days) + "_Days_Price_Pred"])
-            y = y[:-future_days]
-            tscv = TimeSeriesSplit(n_splits=5)
-            for train_index, test_index in tscv.split(X):
-                X_train, X_test = X[train_index], X[test_index]
-                y_train, y_test = y[train_index], y[test_index]
-
-            st.subheader("Svm Model")
-            svr_rbf = SVR(kernel="rbf", C=1e3, gamma=0.00001)
-            svr_rbf.fit(X_train, y_train)
-            svr_rbf_confidence = svr_rbf.score(X_test, y_test)
-            st.write(svr_rbf_confidence)
-
-            st.subheader("Linear Regression")
-            lr_model = LinearRegression()
-            lr_model.fit(X_train, y_train)
-            lr_confidence = lr_model.score(X_test, y_test)
-            st.write(lr_confidence)
-
-            st.subheader("Random Forest")
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_model.fit(X_train, y_train)
-            rf_confidence = rf_model.score(X_test, y_test)
-            st.write(rf_confidence)
-
-            st.header("Scaled Data - Using All Columns")
+            st.header("Using All  Column")
             columns_to_extract = [
                 "Close",
                 "MACD",
@@ -462,100 +367,476 @@ with Models:
             X = X[30 : scaled_df.shape[0] - future_days]
             y = np.array(scaled_df[str(future_days) + "_Days_Price_Pred"])
             y = y[30:-future_days]
+
             tscv = TimeSeriesSplit(n_splits=5)
             for train_index, test_index in tscv.split(X):
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-            st.subheader("Svm Model")
-            svr_rbf = SVR(kernel="rbf", C=1e3, gamma=0.00001)
-            svr_rbf.fit(X_train, y_train)
-            svr_rbf_confidence = svr_rbf.score(X_test, y_test)
-            st.write(svr_rbf_confidence)
+            st.write(f"X_train shape: {X_train.shape}")
+            st.write(f"X_test shape: {X_test.shape}")
+            st.write(f"y_train shape: {y_train.shape}")
+            st.write(f"y_test shape: {y_test.shape}")
+
+            st.subheader("SVM MODEL")
+            svr_python = SVR(kernel="rbf", C=1e3, gamma=0.00001)
+            svr_python.fit(X_train, y_train)
+            svr_python_confidence = svr_python.score(X_test, y_test)
+            st.write(svr_python_confidence)
+
+            (
+                svr_python_mse_value,
+                svr_python_rmse_value,
+                svr_python_r2_value,
+                svr_python_mae_value,
+            ) = evaluate_model(svr_python, X_test, y_test)
+            st.write(f"SVR (with package) MSE: {svr_python_mse_value}")
+            st.write(f"SVR (with package) RMSE: {svr_python_rmse_value}")
+            st.write(f"SVR (with package) R-squared: {svr_python_r2_value}")
+            st.write(f"SVR (with package) MAE: {svr_python_mae_value}")
 
             st.subheader("Linear Regression")
-            lr_model = LinearRegression()
-            lr_model.fit(X_train, y_train)
-            lr_confidence = lr_model.score(X_test, y_test)
-            st.write(lr_confidence)
+            lr_python = LinearRegression()
+            lr_python.fit(X_train, y_train)
+            lr_python_confidence = lr_python.score(X_test, y_test)
+            st.write(lr_python_confidence)
+
+            (
+                lr_python_mse_value,
+                lr_python_rmse_value,
+                lr_python_r2_value,
+                lr_python_mae_value,
+            ) = evaluate_model(lr_python, X_test, y_test)
+            st.write(f"LR (with package) MSE: {lr_python_mse_value}")
+            st.write(f"LR (with package) RMSE: {lr_python_rmse_value}")
+            st.write(f"LR (with package) R-squared: {lr_python_r2_value}")
+            st.write(f"LR (with package) MAE: {lr_python_mae_value}")
 
             st.subheader("Random Forest")
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_model.fit(X_train, y_train)
-            rf_confidence = rf_model.score(X_test, y_test)
-            st.write(rf_confidence)
+            rf_python = RandomForestRegressor(n_estimators=100, random_state=42)
+            rf_python.fit(X_train, y_train)
+            rf_python_confidence = rf_python.score(X_test, y_test)
+            st.write(rf_python_confidence)
 
-            st.header("Evaluation Metrics")
-            st.subheader("For All Models")
-            svm_predictions = svr_rbf.predict(X_test)
-            lr_predictions = lr_model.predict(X_test)
-            rf_predictions = rf_model.predict(X_test)
+            (
+                rf_python_mse_value,
+                rf_python_rmse_value,
+                rf_python_r2_value,
+                rf_python_mae_value,
+            ) = evaluate_model(rf_python, X_test, y_test)
+            st.write(f"RF (with package) MSE: {rf_python_mse_value}")
+            st.write(f"RF (with package) RMSE: {rf_python_rmse_value}")
+            st.write(f"RF (with package) R-squared: {rf_python_r2_value}")
+            st.write(f"RF (with package) MAE: {rf_python_mae_value}")
 
-            def evaluate_model(y_test, predictions):
-                mse = mean_squared_error(y_test, predictions)
-                mae = mean_absolute_error(y_test, predictions)
-                r2 = r2_score(y_test, predictions)
-                mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
-                return mse, mae, r2, mape
+            def evaluate_model(model, X_test, y_test):
+                y_pred = model.predict(X_test)
+                mse = mean_squared_error(y_test, y_pred)
+                rmse = np.sqrt(mse)
+                r2 = r2_score(y_test, y_pred)
+                mae = mean_absolute_error(y_test, y_pred)
+                return {"MSE": mse, "RMSE": rmse, "R-squared": r2, "MAE": mae}
 
-            lr_mse, lr_mae, lr_r2, lr_mape = evaluate_model(y_test, lr_predictions)
-            rf_mse, rf_mae, rf_r2, rf_mape = evaluate_model(y_test, rf_predictions)
-            svm_mse, svm_mae, svm_r2, svm_mape = evaluate_model(y_test, svm_predictions)
+            rf_python_metrics = evaluate_model(rf_python, X_test, y_test)
+            st.write("Random Forest (with package) Metrics:")
+            st.write(rf_python_metrics)
 
-            st.write(
-                f"""Linear Regression -
-            MSE: {lr_mse},
-            MAE: {lr_mae},
-            R2: {lr_r2},
-            MAPE: {lr_mape}%
+            lr_python_metrics = evaluate_model(lr_python, X_test, y_test)
+            st.write("\nLinear Regression (with package) Metrics:")
+            st.write(lr_python_metrics)
 
-            """
-            )
+            svr_python_metrics = evaluate_model(svr_python, X_test, y_test)
+            st.write("\nSupport Vector Machine (with package) Metrics:")
+            st.write(svr_python_metrics)
 
-            st.write(
-                f"""Random Forest -
-            MSE: {rf_mse},
-            MAE: {rf_mae},
-            R2: {rf_r2},
-            MAPE: {rf_mape}%
-
-            """
-            )
-
-            st.write(
-                f"""SVM -
-            MSE: {svm_mse},
-            MAE: {svm_mae},
-            R2: {svm_r2},
-            MAPE: {svm_mape}%
-
-            """
-            )
+            st.header("Calculating Predictions")
+            svm_python_predictions = svr_python.predict(X_test)
+            lr_python_predictions = lr_python.predict(X_test)
+            rf_python_predictions = rf_python.predict(X_test)
+            st.subheader("random forest")
+            st.write(rf_python_predictions)
+            st.subheader("linear regression ")
+            st.write(lr_python_predictions)
+            st.subheader("svm")
+            st.write(svm_python_predictions)
 
             st.header("Plotting Predictions Vs Actual")
             # Plotting the results
             plt.figure(figsize=(14, 7))
 
-            # Linear Regression
+            # # Linear Regression
             plt.subplot(3, 1, 1)
             plt.plot(y_test, label="Actual", color="blue")
-            plt.plot(lr_predictions, label="Linear Regression", color="orange")
-            plt.title("Linear Regression vs Actual")
+            plt.plot(lr_python_predictions, label="Linear Regression", color="orange")
+            plt.title("Linear Regression ( with package ) vs Actual")
             plt.legend()
 
             # Random Forest
             plt.subplot(3, 1, 2)
             plt.plot(y_test, label="Actual", color="blue")
-            plt.plot(rf_predictions, label="Random Forest", color="green")
-            plt.title("Random Forest vs Actual")
+            plt.plot(rf_python_predictions, label="Random Forest", color="green")
+            plt.title("Random Forest ( with package ) vs Actual")
             plt.legend()
 
             # SVM
             plt.subplot(3, 1, 3)
             plt.plot(y_test, label="Actual", color="blue")
-            plt.plot(svm_predictions, label="SVM", color="red")
-            plt.title("SVM vs Actual")
+            plt.plot(svm_python_predictions, label="SVR", color="red")
+            plt.title("SVR ( with package ) vs Actual")
             plt.legend()
 
             plt.tight_layout()
+            plt.show()
             st.pyplot(plt)
+
+    with WPP:
+        if future_days:
+
+            st.title("Random Forest Model")
+
+            def bootstrap_sample(X, y):
+                n_samples = X.shape[0]
+                idxs = np.random.choice(n_samples, n_samples, replace=True)
+                return X[idxs], y[idxs]
+
+            def mean_squared_error(y_true, y_pred):
+                return np.mean((y_true - y_pred) ** 2)
+
+            class Node:
+                def __init__(
+                    self,
+                    feature=None,
+                    threshold=None,
+                    left=None,
+                    right=None,
+                    *,
+                    value=None,
+                ):
+                    self.feature = feature
+                    self.threshold = threshold
+                    self.left = left
+                    self.right = right
+                    self.value = value
+
+                def is_leaf_node(self):
+                    return self.value is not None
+
+            class DecisionTreeRegressor:
+                def __init__(self, max_depth=100, min_samples_split=2):
+                    self.max_depth = max_depth
+                    self.min_samples_split = min_samples_split
+                    self.root = None
+
+                def fit(self, X, y):
+                    self.root = self._grow_tree(X, y)
+
+                def _grow_tree(self, X, y, depth=0):
+                    n_samples, n_features = X.shape
+                    if depth >= self.max_depth or n_samples < self.min_samples_split:
+                        leaf_value = self._calculate_leaf_value(y)
+                        return Node(value=leaf_value)
+
+                    feat_idxs = np.random.choice(n_features, n_features, replace=True)
+                    best_feat, best_thresh = self._best_criteria(X, y, feat_idxs)
+
+                    if best_thresh is None:
+                        leaf_value = self._calculate_leaf_value(y)
+                        return Node(value=leaf_value)
+
+                    left_idxs, right_idxs = self._split(X[:, best_feat], best_thresh)
+                    left = self._grow_tree(X[left_idxs, :], y[left_idxs], depth + 1)
+                    right = self._grow_tree(X[right_idxs, :], y[right_idxs], depth + 1)
+                    return Node(best_feat, best_thresh, left, right)
+
+                def _best_criteria(self, X, y, feat_idxs):
+                    best_mse = float("inf")
+                    split_idx, split_thresh = None, None
+                    for feat_idx in feat_idxs:
+                        X_column = X[:, feat_idx]
+                        thresholds = np.unique(X_column)
+                        for threshold in thresholds:
+                            mse = self._calculate_mse(y, X_column, threshold)
+                            if mse < best_mse:
+                                best_mse = mse
+                                split_idx = feat_idx
+                                split_thresh = threshold
+                    return split_idx, split_thresh
+
+                def _calculate_mse(self, y, X_column, split_thresh):
+                    left_idxs, right_idxs = self._split(X_column, split_thresh)
+                    if len(left_idxs) == 0 or len(right_idxs) == 0:
+                        return float("inf")
+
+                    y_left, y_right = y[left_idxs], y[right_idxs]
+                    mse_left = np.mean((y_left - np.mean(y_left)) ** 2)
+                    mse_right = np.mean((y_right - np.mean(y_right)) ** 2)
+                    n, n_left, n_right = len(y), len(y_left), len(y_right)
+                    mse = (n_left / n) * mse_left + (n_right / n) * mse_right
+                    return mse
+
+                def _split(self, X_column, split_thresh):
+                    left_idxs = np.argwhere(X_column <= split_thresh).flatten()
+                    right_idxs = np.argwhere(X_column > split_thresh).flatten()
+                    return left_idxs, right_idxs
+
+                def _calculate_leaf_value(self, y):
+                    return np.mean(y)
+
+                def predict(self, X):
+                    return np.array([self._traverse_tree(x, self.root) for x in X])
+
+                def _traverse_tree(self, x, node):
+                    if node.is_leaf_node():
+                        return node.value
+                    if x[node.feature] <= node.threshold:
+                        return self._traverse_tree(x, node.left)
+                    return self._traverse_tree(x, node.right)
+
+            class RandomForestRegressorScratch:
+                def __init__(self, n_trees=100, max_depth=100, min_samples_split=2):
+                    self.n_trees = n_trees
+                    self.max_depth = max_depth
+                    self.min_samples_split = min_samples_split
+                    self.trees = []
+
+                def fit(self, X, y):
+                    self.trees = []
+                    for _ in range(self.n_trees):
+                        tree = DecisionTreeRegressor(
+                            max_depth=self.max_depth,
+                            min_samples_split=self.min_samples_split,
+                        )
+                        X_sample, y_sample = bootstrap_sample(X, y)
+                        tree.fit(X_sample, y_sample)
+                        self.trees.append(tree)
+
+                def predict(self, X):
+                    tree_preds = np.array([tree.predict(X) for tree in self.trees])
+                    return np.mean(tree_preds, axis=0)
+
+                def score(self, X, y):
+                    y_pred = self.predict(X)
+                    return mean_squared_error(y, y_pred)
+
+                # Example usage (ensure X_train, y_train, X_test, y_test are defined)
+                # X_train, y_train, X_test, y_test = <your data loading code>
+
+                # Ensure X_train and y_train are numpy arrays
+                # X_train = np.array(X_train)
+                # y_train = np.array(y_train)
+
+            rf_scratch = RandomForestRegressorScratch(n_trees=3, max_depth=10)
+            rf_scratch.fit(X_train, y_train)
+
+            (
+                rf_scratch_mse_value,
+                rf_scratch_rmse_value,
+                rf_scratch_r2_value,
+                rf_scratch_mae_value,
+            ) = evaluate_model(rf_scratch, X_test, y_test)
+            st.write(f"RF (w/o package) MSE: {rf_scratch_mse_value}")
+            st.write(f"RF (w/o package) RMSE: {rf_scratch_rmse_value}")
+            st.write(f"RF (w/o package) R-squared: {rf_scratch_r2_value}")
+            st.write(f"RF (w/o package) MAE: {rf_scratch_mae_value}")
+
+            st.title("LInear Regression Model")
+
+            class LinearRegressionScratch:
+                def __init__(self, lr=0.001, n_iters=1000):
+                    self.lr = lr
+                    self.n_iters = n_iters
+                    self.weights = None
+                    self.bias = None
+
+                def fit(self, X, y):
+                    n_samples, n_features = X.shape
+                    self.weights = np.zeros(n_features)
+                    self.bias = 0
+
+                    for _ in range(self.n_iters):
+                        y_pred = np.dot(X, self.weights) + self.bias
+
+                        dw = (1 / n_samples) * np.dot(X.T, (y_pred - y))
+                        db = (1 / n_samples) * np.sum(y_pred - y)
+
+                        self.weights = self.weights - self.lr * dw
+                        self.bias = self.bias - self.lr * db
+
+                def predict(self, X):
+                    y_pred = np.dot(X, self.weights) + self.bias
+                    return y_pred
+
+            lr_scratch = LinearRegressionScratch(lr=0.01)
+            lr_scratch.fit(X_train, y_train)
+            (
+                lr_scratch_mse_value,
+                lr_scratch_rmse_value,
+                lr_scratch_r2_value,
+                lr_scratch_mae_value,
+            ) = evaluate_model(lr_scratch, X_test, y_test)
+            st.write(f"LR (w/o package) MSE: {lr_scratch_mse_value}")
+            st.write(f"LR (w/o package) RMSE: {lr_scratch_rmse_value}")
+            st.write(f"LR (w/o package) R-squared: {lr_scratch_r2_value}")
+            st.write(f"LR (w/o package) MAE: {lr_scratch_mae_value}")
+
+            st.title("SVM Model")
+
+            class SVRscratch(object):
+                def __init__(self, epsilon=0.5):
+                    self.epsilon = epsilon
+
+                def fit(self, X, y, epochs=100, learning_rate=0.1):
+                    self.sess = tf.Session()
+
+                    feature_len = X.shape[-1] if len(X.shape) > 1 else 1
+
+                    if len(X.shape) == 1:
+                        X = X.reshape(-1, 1)
+                    if len(y.shape) == 1:
+                        y = y.reshape(-1, 1)
+
+                    self.X = tf.placeholder(dtype=tf.float32, shape=(None, feature_len))
+                    self.y = tf.placeholder(dtype=tf.float32, shape=(None, 1))
+
+                    self.W = tf.Variable(tf.random_normal(shape=(feature_len, 1)))
+                    self.b = tf.Variable(tf.random_normal(shape=(1,)))
+
+                    self.y_pred = tf.matmul(self.X, self.W) + self.b
+
+                    # self.loss = tf.reduce_mean(tf.square(self.y - self.y_pred))
+                    # self.loss = tf.reduce_mean(tf.cond(self.y_pred - self.y < self.epsilon, lambda: 0, lambda: 1))
+
+                    # Second part of following equation, loss is a function of how much the error exceeds a defined value, epsilon
+                    # Error lower than epsilon = no penalty.
+                    self.loss = tf.norm(self.W) / 2 + tf.reduce_mean(
+                        tf.maximum(0.0, tf.abs(self.y_pred - self.y) - self.epsilon)
+                    )
+                    #         self.loss = tf.reduce_mean(tf.maximum(0., tf.abs(self.y_pred - self.y) - self.epsilon))
+
+                    opt = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+                    opt_op = opt.minimize(self.loss)
+
+                    self.sess.run(tf.global_variables_initializer())
+
+                    for i in range(epochs):
+                        loss = self.sess.run(self.loss, {self.X: X, self.y: y})
+                        print("{}/{}: loss: {}".format(i + 1, epochs, loss))
+
+                        self.sess.run(opt_op, {self.X: X, self.y: y})
+
+                    return self
+
+                def predict(self, X, y=None):
+                    if len(X.shape) == 1:
+                        X = X.reshape(-1, 1)
+
+                    y_pred = self.sess.run(self.y_pred, {self.X: X})
+                    return y_pred
+
+        svr_scratch = SVRscratch(epsilon=0.01)
+        svr_scratch.fit(X_train, y_train)
+        (
+            svr_scratch_mse_value,
+            svr_scratch_rmse_value,
+            svr_scratch_r2_value,
+            svr_scratch_mae_value,
+        ) = evaluate_model(svr_scratch, X_test, y_test)
+        st.write(f"SVR (w/o package) MSE: {svr_scratch_mse_value}")
+        st.write(f"SVR (w/o package) RMSE: {svr_scratch_rmse_value}")
+        st.write(f"SVR (w/o package) R-squared: {svr_scratch_r2_value}")
+        st.write(f"SVR (w/o package) MAE: {svr_scratch_mae_value}")
+
+        svm_scratch_predictions = svr_scratch.predict(X_test)
+        lr_scratch_predictions = lr_scratch.predict(X_test)
+        rf_scratch_predictions = rf_scratch.predict(X_test)
+
+        # Plotting the results
+        plt.figure(figsize=(14, 7))
+
+        # Linear Regression
+        plt.subplot(3, 1, 1)
+        plt.plot(y_test, label="Actual", color="blue")
+        plt.plot(lr_scratch_predictions, label="Linear Regression", color="orange")
+        plt.title("Linear Regression ( w/o package ) vs Actual")
+        plt.legend()
+
+        # Random Forest
+        plt.subplot(3, 1, 2)
+        plt.plot(y_test, label="Actual", color="blue")
+        plt.plot(rf_scratch_predictions, label="Random Forest", color="green")
+        plt.title("Random Forest ( w/o package ) vs Actual")
+        plt.legend()
+
+        # SVM
+        plt.subplot(3, 1, 3)
+        plt.plot(y_test, label="Actual", color="blue")
+        plt.plot(svm_scratch_predictions, label="SVR", color="red")
+        plt.title("SVR ( w/o package ) vs Actual")
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+        st.plot(plt)
+
+
+with Compare:
+    if future_days:
+        comparision_data = {
+            "MSE": [
+                svr_python_mse_value,
+                svr_scratch_mse_value,
+                "",
+                rf_python_mse_value,
+                rf_scratch_mse_value,
+                "",
+                lr_python_mse_value,
+                lr_scratch_mse_value,
+            ],
+            "RMSE": [
+                svr_python_rmse_value,
+                svr_scratch_rmse_value,
+                "",
+                rf_python_rmse_value,
+                rf_scratch_rmse_value,
+                "",
+                lr_python_rmse_value,
+                lr_scratch_rmse_value,
+            ],
+            "R^2": [
+                svr_python_r2_value,
+                svr_scratch_r2_value,
+                "",
+                rf_python_r2_value,
+                rf_scratch_r2_value,
+                "",
+                lr_python_r2_value,
+                lr_scratch_r2_value,
+            ],
+            "MAE": [
+                svr_python_mae_value,
+                svr_scratch_mae_value,
+                "",
+                rf_python_mae_value,
+                rf_scratch_mae_value,
+                "",
+                lr_python_mae_value,
+                lr_scratch_mae_value,
+            ],
+        }
+
+        comparision_df = pd.DataFrame(comparision_data)
+
+    algo = [
+        "SVR (with package)",
+        "SVR (w/o package)",
+        "",
+        "RF (with package)",
+        "RF (w/o package)",
+        "",
+        "LR (with package)",
+        "LR (w/o package)",
+    ]
+
+    comparision_df.index = algo
+
+    st.write(comparision_df)
